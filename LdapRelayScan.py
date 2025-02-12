@@ -119,6 +119,8 @@ def InternalDomainFromAnonymousLdap(nameserverIp):
 #the fact that the certificate is self-signed, or
 #no error at all. Any other "successful" edge cases
 #not yet accounted for.
+
+'''
 def DoesLdapsCompleteHandshake(dcIp):
   s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
   s.settimeout(5)
@@ -141,7 +143,33 @@ def DoesLdapsCompleteHandshake(dcIp):
     else:
       print("Unexpected error during LDAPS handshake: " + str(e))
     ssl_sock.close()
+'''
 
+#FIX: replaced ssl.wrap_socket (deprecated) with ssl.SSLContext.wrap_socket
+
+def DoesLdapsCompleteHandshake(dcIp):
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.settimeout(5)
+
+    # creating ssl context
+    context = ssl.create_default_context()
+    ssl_sock = context.wrap_socket(s, server_hostname=dcIp) 
+
+    ssl_sock.connect((dcIp, 636))
+    try:
+        ssl_sock.do_handshake()
+        ssl_sock.close()
+        return True
+    except Exception as e:
+        if "CERTIFICATE_VERIFY_FAILED" in str(e):
+            ssl_sock.close()
+            return True
+        if "handshake operation timed out" in str(e):
+            ssl_sock.close()
+            return False
+        else:
+            print("Unexpected error during LDAPS handshake: " + str(e))
+        ssl_sock.close()
 
 #Conduct and LDAP bind and determine if server signing
 #requirements are enforced based on potential errors
